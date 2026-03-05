@@ -1,36 +1,247 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Bitacora TCU - App Unificada en Next.js
 
-## Getting Started
+Aplicacion web para el registro y seguimiento de actividades de Trabajo Comunal Universitario (TCU) de la Universidad Tecnica Nacional.
 
-First, run the development server:
+Esta version migra y unifica:
+
+- Frontend `React + Vite`.
+- Backend `Node + Express`.
+
+Ahora todo corre en un solo proyecto Next.js con `App Router`, API interna y acceso directo a MySQL.
+
+## Objetivos de la migracion
+
+- Unificar frontend y backend en una sola base de codigo.
+- Reducir complejidad operativa (un solo deploy y un solo runtime).
+- Mantener compatibilidad con los endpoints de la API anterior.
+- Conservar validaciones funcionales del formulario TCU.
+
+## Tecnologias principales
+
+- Next.js 16 (App Router)
+- React 19
+- Tailwind CSS 4
+- MySQL (`mysql2/promise`)
+- Leaflet + React Leaflet
+
+## Requisitos previos
+
+- Node.js 18+
+- npm 9+
+- MySQL 8+
+- Esquema de base de datos del sistema TCU ya creado (tablas, vistas y procedimientos almacenados)
+
+## Instalacion
+
+1. Instalar dependencias
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Crear archivo de entorno local
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+```bash
+Copy-Item .env.example .env.local
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+3. Ajustar valores en `.env.local`
 
-## Learn More
+```env
+# Frontend
+NEXT_PUBLIC_API_URL=http://localhost:3000/api
 
-To learn more about Next.js, take a look at the following resources:
+# Backend (MySQL)
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=root
+DB_NAME=bitacora_tcu
+DB_PORT=3306
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# Uploads (bytes)
+MAX_FILE_SIZE=5242880
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Scripts disponibles
 
-## Deploy on Vercel
+```bash
+# Desarrollo
+npm run dev
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+# Lint
+npm run lint
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# Build produccion
+npm run build
+
+# Ejecutar build
+npm run start
+```
+
+La aplicacion inicia por defecto en `http://localhost:3000`.
+
+## Arquitectura de la app
+
+### Frontend
+
+- `src/views/TCUFormView.jsx`: vista principal del formulario.
+- `src/components/*`: componentes reutilizables (header, privacidad, mapa).
+- `src/hooks/*`: manejo de estado, busqueda de estudiantes, geolocalizacion y fecha.
+- `src/services/formService.js`: cliente HTTP hacia `/api/*`.
+- `src/utils/validators.js`: validaciones de formulario.
+
+### Backend interno (API Next)
+
+- `src/app/api/*`: endpoints HTTP.
+- `src/lib/database.js`: pool de conexiones MySQL.
+- `src/lib/models/*`: logica SQL de estudiantes, actividades y evidencias.
+- `src/lib/uploads.js`: validacion y persistencia de archivos en `public/uploads`.
+
+### Persistencia de archivos
+
+- Las evidencias de archivos se almacenan en: `public/uploads`.
+- La ruta guardada en base de datos se mantiene con formato: `/uploads/<archivo>`.
+
+## Estructura del proyecto
+
+```text
+tcu-next/
+	src/
+		app/
+			page.js
+			api/
+				route.js
+				estudiantes/
+				actividades/
+				evidencias/
+		components/
+			FormHeader.jsx
+			PrivacyNotice.jsx
+			InteractiveMap.jsx
+			LeafletMapInner.jsx
+		hooks/
+			useFormData.js
+			useEstudiantes.js
+			useGeolocation.js
+			useFechaHoy.js
+		services/
+			formService.js
+		utils/
+			validators.js
+			mapUtils.js
+		lib/
+			database.js
+			http.js
+			uploads.js
+			models/
+				estudiante.model.js
+				actividad.model.js
+				evidencia.model.js
+	public/
+		tcu-logo.png
+		uploads/
+```
+
+## Endpoints API disponibles
+
+### Base
+
+- `GET /api`
+
+### Estudiantes
+
+- `GET /api/estudiantes`
+- `POST /api/estudiantes`
+- `GET /api/estudiantes/search?q=<texto>`
+- `GET /api/estudiantes/cedula/:cedula`
+- `GET /api/estudiantes/:id`
+- `PUT /api/estudiantes/:id`
+- `GET /api/estudiantes/:id/resumen`
+
+### Actividades
+
+- `GET /api/actividades`
+- `POST /api/actividades`
+- `GET /api/actividades/estadisticas`
+- `GET /api/actividades/estudiante/:estudianteId`
+- `GET /api/actividades/:id`
+- `PUT /api/actividades/:id`
+- `DELETE /api/actividades/:id`
+- `PATCH /api/actividades/:id/aprobar`
+- `PATCH /api/actividades/:id/rechazar`
+
+### Evidencias
+
+- `POST /api/evidencias`
+- `GET /api/evidencias/actividad/:actividadId`
+- `DELETE /api/evidencias/:id`
+
+## Compatibilidad con la version anterior
+
+- Se mantienen rutas y estructura general de respuestas (`success`, `data`, `message`, `error`).
+- El frontend consume por defecto `NEXT_PUBLIC_API_URL` y usa `/api` si no esta definida.
+- La logica de actividades conserva soporte para:
+	- Evidencia de texto.
+	- Evidencia de foto/documento con `multipart/form-data`.
+	- Integracion con procedimientos almacenados (`sp_registrar_actividad`, `sp_aprobar_actividad`, `sp_rechazar_actividad`).
+
+## Caracteristicas funcionales del formulario
+
+- Busqueda de estudiantes por cedula, nombre y apellido.
+- Registro de actividad con tipo y subtipo.
+- Campos condicionales para tipo de capacitacion y reflexiones.
+- Evidencia obligatoria (texto, foto o documento).
+- Geolocalizacion por GPS y seleccion manual en mapa.
+- Validaciones de negocio:
+	- Rango de fecha (no futura, maximo 10 dias hacia atras).
+	- Hora inicio menor que hora final.
+	- Limite de horas por actividad.
+	- Descripcion con longitud minima y maxima.
+
+## Validaciones de archivos
+
+- Tamano maximo por archivo: `MAX_FILE_SIZE` (por defecto 5 MB).
+- Tipos permitidos:
+	- `Foto`: `image/jpeg`, `image/jpg`, `image/png`, `image/gif`, `image/webp`
+	- `Documentos`: `application/pdf`, `application/msword`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `application/vnd.ms-excel`, `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
+
+## Consideraciones tecnicas importantes
+
+- Leaflet se carga sin SSR para evitar `window is not defined` en `next build`.
+- El mapa usa `dynamic import` en `InteractiveMap` y componente cliente en `LeafletMapInner`.
+- Para ambiente productivo, considerar almacenamiento externo (S3, Blob, etc.) en lugar de disco local para `uploads`.
+
+## Troubleshooting
+
+### No aparecen estudiantes
+
+- Verificar conexion a MySQL y credenciales en `.env.local`.
+- Confirmar existencia de datos en tabla `estudiantes`.
+- Revisar consola del servidor Next para errores SQL.
+
+### Error al registrar actividad
+
+- Revisar que existan los procedimientos almacenados requeridos.
+- Verificar estructura de `multipart/form-data` cuando se envian archivos.
+- Confirmar que el `tipoEvidencia` coincida con los tipos permitidos.
+
+### Error en mapa o build
+
+- Confirmar que `leaflet` y `react-leaflet` esten instalados.
+- Ejecutar `npm run build` para validar SSR/CSR.
+- Revisar que la inicializacion de Leaflet no ocurra durante render del servidor.
+
+## Recomendaciones de despliegue
+
+- Definir todas las variables de entorno en el proveedor de hosting.
+- Asegurar acceso de red desde el runtime de Next hacia MySQL.
+- Configurar persistencia para archivos `uploads` si el entorno es efimero.
+- Ejecutar siempre `npm run lint` y `npm run build` antes de publicar.
+
+## Licencia
+
+ISC
+
+## Autor
+
+Universidad Tecnica Nacional - Sistema TCU
