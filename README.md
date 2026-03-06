@@ -20,6 +20,7 @@ Ahora todo corre en un solo proyecto Next.js con `App Router`, API interna y acc
 
 - Next.js 16 (App Router)
 - React 19
+- TypeScript
 - Tailwind CSS 4
 - MySQL (`mysql2/promise`)
 - Leaflet + React Leaflet
@@ -84,18 +85,22 @@ La aplicacion inicia por defecto en `http://localhost:3000`.
 
 ### Frontend
 
-- `src/views/TCUFormView.jsx`: vista principal del formulario.
-- `src/components/*`: componentes reutilizables (header, privacidad, mapa).
+- `src/components/features/TCUFormView.tsx`: vista principal del formulario.
+- `src/components/features/map/`: mapa interactivo con carga dinamica (Leaflet).
+- `src/components/layout/FormHeader.tsx`: cabecera del formulario.
+- `src/components/ui/PrivacyNotice.tsx`: aviso de privacidad.
 - `src/hooks/*`: manejo de estado, busqueda de estudiantes, geolocalizacion y fecha.
-- `src/services/formService.js`: cliente HTTP hacia `/api/*`.
-- `src/utils/validators.js`: validaciones de formulario.
+- `src/services/form.ts`: cliente HTTP hacia `/api/*`.
+- `src/utils/validators.ts`: validaciones de formulario.
+- `src/actions/index.ts`: Server Actions de Next.js.
+- `src/types/index.ts`: tipos e interfaces compartidos.
 
 ### Backend interno (API Next)
 
 - `src/app/api/*`: endpoints HTTP.
-- `src/lib/database.js`: pool de conexiones MySQL.
-- `src/lib/models/*`: logica SQL de estudiantes, actividades y evidencias.
-- `src/lib/uploads.js`: validacion y persistencia de archivos en `public/uploads`.
+- `src/lib/db/index.ts`: pool de conexiones MySQL.
+- `src/lib/db/models/*`: logica SQL de estudiantes, actividades y evidencias.
+- `src/lib/uploads.ts`: validacion y persistencia de archivos en `public/uploads`.
 
 ### Persistencia de archivos
 
@@ -107,38 +112,54 @@ La aplicacion inicia por defecto en `http://localhost:3000`.
 ```text
 tcu-next/
 	src/
+		actions/
+			index.ts
 		app/
-			page.js
+			layout.tsx
+			page.tsx
+			loading.tsx
+			error.tsx
+			not-found.tsx
 			api/
-				route.js
+				route.ts
 				estudiantes/
 				actividades/
 				evidencias/
 		components/
-			FormHeader.jsx
-			PrivacyNotice.jsx
-			InteractiveMap.jsx
-			LeafletMapInner.jsx
+			features/
+				TCUFormView.tsx
+				map/
+					InteractiveMap.tsx
+					LeafletMapInner.tsx
+			layout/
+				FormHeader.tsx
+			ui/
+				PrivacyNotice.tsx
+		constants/
+			form.ts
 		hooks/
-			useFormData.js
-			useEstudiantes.js
-			useGeolocation.js
-			useFechaHoy.js
-		services/
-			formService.js
-		utils/
-			validators.js
-			mapUtils.js
+			index.ts
+			useFormData.ts
+			useEstudiantes.ts
+			useGeolocation.ts
+			useFechaHoy.ts
 		lib/
-			database.js
-			http.js
-			uploads.js
-			models/
-				estudiante.model.js
-				actividad.model.js
-				evidencia.model.js
+			http.ts
+			uploads.ts
+			db/
+				index.ts
+				models/
+					estudiante.model.ts
+					actividad.model.ts
+					evidencia.model.ts
+		services/
+			form.ts
+		types/
+			index.ts
+		utils/
+			validators.ts
+			map.ts
 	public/
-		tcu-logo.png
 		uploads/
 ```
 

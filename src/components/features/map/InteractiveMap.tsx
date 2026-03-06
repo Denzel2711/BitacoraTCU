@@ -1,6 +1,13 @@
 import dynamic from 'next/dynamic';
 
-const LeafletMapInner = dynamic(() => import('./LeafletMapInner'), {
+interface LeafletMapInnerProps {
+  center: [number, number];
+  ubicacionLat?: number | null;
+  ubicacionLng?: number | null;
+  onMapClick: (lat: number, lng: number) => void;
+}
+
+const LeafletMapInner = dynamic<LeafletMapInnerProps>(() => import('./LeafletMapInner'), {
   ssr: false,
   loading: () => <div className="h-full w-full animate-pulse bg-cyan-50" />,
 });

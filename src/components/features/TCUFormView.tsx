@@ -8,7 +8,7 @@ import { setupLeafletIcons } from '@/utils/map';
 import { validateForm } from '@/utils/validators';
 import FormHeader from '@/components/layout/FormHeader';
 import PrivacyNotice from '@/components/ui/PrivacyNotice';
-import InteractiveMap from '@/components/map/InteractiveMap';
+import InteractiveMap from '@/components/features/map/InteractiveMap';
 import type { Estudiante } from '@/types';
 
 const TCUFormView = () => {
