@@ -3,9 +3,16 @@ import type { Estudiante, FormData } from '@/types';
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 const buscarEstudiante = async (cedula: string): Promise<Estudiante> => {
-  const response = await fetch(`${API_BASE_URL}/estudiantes/cedula/${cedula}`);
+  const response = await fetch(`${API_BASE_URL}/estudiantes/cedula/${encodeURIComponent(cedula)}`);
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || 'Error al buscar estudiante');
+  return data.data;
+};
+
+const obtenerEstudiantePorId = async (id: number | string): Promise<Estudiante> => {
+  const response = await fetch(`${API_BASE_URL}/estudiantes/${encodeURIComponent(String(id))}`);
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Error al obtener estudiante');
   return data.data;
 };
 
@@ -27,8 +34,10 @@ const getEstudiantes = async (): Promise<Estudiante[]> => {
   }
 };
 
-const submitForm = async (formData: FormData): Promise<unknown> => {
-  const estudiante = await buscarEstudiante(formData.cedula);
+const submitForm = async (formData: FormData, accessToken?: string, estudianteIdSesion?: number): Promise<unknown> => {
+  const estudiante = estudianteIdSesion
+    ? await obtenerEstudiantePorId(estudianteIdSesion)
+    : await buscarEstudiante(formData.cedula);
   if (!estudiante) throw new Error('Estudiante no encontrado. Verifique el número de cédula.');
 
   const actividadData = new globalThis.FormData();
@@ -56,21 +65,31 @@ const submitForm = async (formData: FormData): Promise<unknown> => {
   else if (formData.tipoEvidencia === 'Documentos' && formData.evidenciaDocumento)
     actividadData.append('archivo', formData.evidenciaDocumento);
 
-  const response = await fetch(`${API_BASE_URL}/actividades`, { method: 'POST', body: actividadData });
+  const headers: Record<string, string> = {};
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}/actividades`, {
+    method: 'POST',
+    body: actividadData,
+    headers,
+    credentials: 'include',
+  });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || 'Error al enviar el formulario');
   return data;
 };
 
-const obtenerActividadesEstudiante = async (estudianteId: number): Promise<unknown[]> => {
-  const response = await fetch(`${API_BASE_URL}/actividades/estudiante/${estudianteId}`);
+const obtenerActividadesEstudiante = async (estudianteId: number | string): Promise<unknown[]> => {
+  const response = await fetch(`${API_BASE_URL}/actividades/estudiante/${encodeURIComponent(String(estudianteId))}`);
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || 'Error al obtener actividades');
   return data.data;
 };
 
-const obtenerResumenEstudiante = async (estudianteId: number): Promise<unknown> => {
-  const response = await fetch(`${API_BASE_URL}/estudiantes/${estudianteId}/resumen`);
+const obtenerResumenEstudiante = async (estudianteId: number | string): Promise<unknown> => {
+  const response = await fetch(`${API_BASE_URL}/estudiantes/${encodeURIComponent(String(estudianteId))}/resumen`);
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || 'Error al obtener resumen');
   return data.data;
@@ -78,6 +97,7 @@ const obtenerResumenEstudiante = async (estudianteId: number): Promise<unknown> 
 
 export const formService = {
   submitForm,
+  obtenerEstudiantePorId,
   buscarEstudiante,
   searchEstudiantes,
   getEstudiantes,

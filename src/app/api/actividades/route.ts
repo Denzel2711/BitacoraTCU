@@ -1,11 +1,19 @@
 import ActividadModel from '@/lib/db/models/actividad.model';
 import EvidenciaModel from '@/lib/db/models/evidencia.model';
 import { created, fail, ok, serverError } from '@/lib/http';
+import { requireAuthRole } from '@/lib/auth/authorization';
+import { registerAuditEvent } from '@/lib/services/audit.service';
+import { assertSameOrigin } from '@/lib/security/request-context';
 import { saveUploadedFile, validateEvidenceFile } from '@/lib/uploads';
 import type { NextRequest } from 'next/server';
 
 export async function GET(request: NextRequest) {
   try {
+    const authError = requireAuthRole(request, ['Admin']);
+    if (authError) {
+      return authError;
+    }
+
     const { searchParams } = new URL(request.url);
 
     const filters = {
@@ -26,6 +34,16 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const authError = requireAuthRole(request, ['Admin', 'Estudiante']);
+    if (authError) {
+      return authError;
+    }
+
+    const csrfError = assertSameOrigin(request);
+    if (csrfError) {
+      return fail(csrfError, 403);
+    }
+
     const formData = await request.formData();
 
     const estudianteId = formData.get('estudianteId') as string | null;
@@ -65,6 +83,10 @@ export async function POST(request: NextRequest) {
       descripcionUbicacion
     });
 
+    if (!actividad) {
+      return fail('No fue posible registrar la actividad', 500);
+    }
+
     let evidencia = null;
 
     if (tipoEvidencia === 'Texto' && evidenciaTexto) {
@@ -73,6 +95,15 @@ export async function POST(request: NextRequest) {
       const savedFile = await saveUploadedFile(archivo as File);
       evidencia = await EvidenciaModel.createArchivo(Number(actividad.id), tipoEvidencia, savedFile);
     }
+
+    await registerAuditEvent({
+      tabla: 'actividades',
+      accion: 'CREATE',
+      registroId: actividad.id,
+      descripcion: 'Registro de actividad y evidencia',
+      after: { actividad, evidencia },
+      request,
+    });
 
     return created({ ...actividad, evidencia }, 'Actividad registrada exitosamente');
   } catch (error) {

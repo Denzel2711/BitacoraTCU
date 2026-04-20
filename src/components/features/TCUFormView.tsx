@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useFormData, useEstudiantes, useGeolocation, useFechaHoy } from '@/hooks';
+import { useFormData, useGeolocation, useFechaHoy } from '@/hooks';
 import { SUBTIPOS_PLANIFICACION, SUBTIPOS_EJECUCION, TIPOS_CAPACITACION } from '@/constants/form';
 import { formService } from '@/services/form';
 import { setupLeafletIcons } from '@/utils/map';
@@ -9,37 +9,52 @@ import { validateForm } from '@/utils/validators';
 import FormHeader from '@/components/layout/FormHeader';
 import PrivacyNotice from '@/components/ui/PrivacyNotice';
 import InteractiveMap from '@/components/features/map/InteractiveMap';
-import type { Estudiante } from '@/types';
 
-const TCUFormView = () => {
+interface TCUFormViewProps {
+  accessToken: string;
+  estudianteSesionId: number | null;
+}
+
+const TCUFormView = ({ accessToken, estudianteSesionId }: TCUFormViewProps) => {
   const { formData, resetForm, updateFormData } = useFormData();
-  const { cedulaSearch, setCedulaSearch, showDropdown, setShowDropdown, filteredEstudiantes } = useEstudiantes();
   const { mapCenter, handleGetLocation, handleMapClick } = useGeolocation(formData, updateFormData);
   const fechaHoy = useFechaHoy();
+  const [cedulaSearch, setCedulaSearch] = useState('');
   const [maxFechaActividad] = useState(() => new Date().toISOString().split('T')[0]);
   const [minFechaActividad] = useState(() => {
     const minDate = new Date();
     minDate.setDate(minDate.getDate() - 10);
     return minDate.toISOString().split('T')[0];
   });
-
   useEffect(() => {
     setupLeafletIcons();
   }, []);
 
-  const handleCedulaSelect = (estudiante: Estudiante) => {
-    updateFormData({
-      cedula: estudiante.cedula,
-      nombre: estudiante.nombre,
-      primerApellido: estudiante.primer_apellido ?? estudiante.primerApellido,
-      segundoApellido: estudiante.segundo_apellido ?? estudiante.segundoApellido,
-      carrera: estudiante.carrera,
-      academicoACargo: estudiante.academico_a_cargo ?? estudiante.academicoACargo,
-      sede: estudiante.sede
-    });
-    setCedulaSearch(estudiante.cedula);
-    setShowDropdown(false);
-  };
+  useEffect(() => {
+    const cargarEstudianteSesion = async () => {
+      if (!estudianteSesionId) {
+        return;
+      }
+
+      try {
+        const estudiante = await formService.obtenerEstudiantePorId(estudianteSesionId);
+        updateFormData({
+          cedula: estudiante.cedula,
+          nombre: estudiante.nombre,
+          primerApellido: estudiante.primer_apellido ?? estudiante.primerApellido,
+          segundoApellido: estudiante.segundo_apellido ?? estudiante.segundoApellido,
+          carrera: estudiante.carrera,
+          academicoACargo: estudiante.academico_a_cargo ?? estudiante.academicoACargo,
+          sede: estudiante.sede,
+        });
+        setCedulaSearch(estudiante.cedula);
+      } catch {
+        alert('No fue posible cargar los datos del estudiante en sesión');
+      }
+    };
+
+    void cargarEstudianteSesion();
+  }, [estudianteSesionId, updateFormData]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -53,10 +68,27 @@ const TCUFormView = () => {
     }
 
     try {
-      await formService.submitForm(formData);
+      if (!accessToken) {
+        alert('Debe iniciar sesión para enviar el formulario.');
+        return;
+      }
+
+      await formService.submitForm(formData, accessToken, estudianteSesionId ?? undefined);
       alert('Formulario enviado exitosamente');
       resetForm();
-      setCedulaSearch('');
+      if (estudianteSesionId) {
+        const estudiante = await formService.obtenerEstudiantePorId(estudianteSesionId);
+        updateFormData({
+          cedula: estudiante.cedula,
+          nombre: estudiante.nombre,
+          primerApellido: estudiante.primer_apellido ?? estudiante.primerApellido,
+          segundoApellido: estudiante.segundo_apellido ?? estudiante.segundoApellido,
+          carrera: estudiante.carrera,
+          academicoACargo: estudiante.academico_a_cargo ?? estudiante.academicoACargo,
+          sede: estudiante.sede,
+        });
+        setCedulaSearch(estudiante.cedula);
+      }
     } catch {
       alert('Error al enviar el formulario');
     }
@@ -65,7 +97,20 @@ const TCUFormView = () => {
   const handleReset = () => {
     if (confirm('¿Está seguro de que desea descartar todos los datos del formulario?')) {
       resetForm();
-      setCedulaSearch('');
+      if (estudianteSesionId) {
+        void formService.obtenerEstudiantePorId(estudianteSesionId).then((estudiante) => {
+          updateFormData({
+            cedula: estudiante.cedula,
+            nombre: estudiante.nombre,
+            primerApellido: estudiante.primer_apellido ?? estudiante.primerApellido,
+            segundoApellido: estudiante.segundo_apellido ?? estudiante.segundoApellido,
+            carrera: estudiante.carrera,
+            academicoACargo: estudiante.academico_a_cargo ?? estudiante.academicoACargo,
+            sede: estudiante.sede,
+          });
+          setCedulaSearch(estudiante.cedula);
+        });
+      }
     }
   };
 
@@ -96,31 +141,11 @@ const TCUFormView = () => {
                   type="text"
                   required
                   value={cedulaSearch}
-                  onChange={(e) => {
-                    setCedulaSearch(e.target.value);
-                    setShowDropdown(true);
-                  }}
-                  onFocus={() => setShowDropdown(true)}
-                  placeholder="Escriba o seleccione el número de cédula"
+                  readOnly
+                  disabled
+                  placeholder="Cédula cargada automáticamente desde su sesión"
                   className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all duration-200"
                 />
-
-                {showDropdown && filteredEstudiantes.length > 0 && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border-2 border-cyan-200 rounded-xl shadow-xl max-h-60 overflow-auto">
-                    {filteredEstudiantes.map((estudiante) => (
-                      <div
-                        key={estudiante.cedula}
-                        onClick={() => handleCedulaSelect(estudiante)}
-                        className="px-4 py-3 hover:bg-cyan-50 cursor-pointer border-b border-slate-100 transition-colors duration-150"
-                      >
-                        <div className="font-semibold">{estudiante.cedula}</div>
-                        <div className="text-sm text-gray-600">
-                          {estudiante.nombre} {estudiante.primer_apellido ?? estudiante.primerApellido} {estudiante.segundo_apellido ?? estudiante.segundoApellido}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
 
               {formData.cedula && (
@@ -515,12 +540,13 @@ const TCUFormView = () => {
             </button>
             <button
               type="submit"
+              disabled={!accessToken}
               className="px-8 py-3 bg-gradient-to-r from-cyan-600 to-orange-500 hover:from-cyan-700 hover:to-orange-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center space-x-2 transform hover:scale-105"
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h5a2 2 0 012 2v7a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2h5v5.586l-1.293-1.293zM9 4a1 1 0 012 0v2H9V4z" />
               </svg>
-              <span>Enviar Formulario</span>
+              <span>{accessToken ? 'Enviar Formulario' : 'Inicie sesión para enviar'}</span>
             </button>
           </div>
         </form>

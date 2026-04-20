@@ -1,5 +1,7 @@
 import 'server-only';
 import { getPool } from '..';
+import EstudianteModel from './estudiante.model';
+import MatriculacionModel from './matriculacion.model';
 import type { RowDataPacket } from 'mysql2';
 
 export interface ActividadRow extends RowDataPacket {
@@ -20,6 +22,11 @@ export interface ActividadRow extends RowDataPacket {
   descripcion_ubicacion: string | null;
   estado: 'Pendiente' | 'Aprobada' | 'Rechazada';
   fecha_registro: string;
+  matriculacion_id: number | null;
+  periodo: string | null;
+  fecha_inicio: string | null;
+  fecha_fin: string | null;
+  matriculacion_estado: 'Activa' | 'Completada' | 'Suspendida' | null;
 }
 
 interface ActividadFilters {
@@ -47,11 +54,31 @@ interface ActividadInput {
 }
 
 class ActividadModel {
+  private static async resolveEstudianteId(estudianteId?: string | number): Promise<number | null> {
+    if (estudianteId === undefined || estudianteId === null || estudianteId === '') {
+      return null;
+    }
+
+    const stringValue = String(estudianteId).trim();
+
+    if (/^\d+$/.test(stringValue)) {
+      return Number(stringValue);
+    }
+
+    const estudiante = await EstudianteModel.findByIdentifier(stringValue);
+    return estudiante?.id ?? null;
+  }
+
   static async findAll(filters: ActividadFilters = {}): Promise<ActividadRow[]> {
     let query = 'SELECT * FROM vista_actividades_completas WHERE 1=1';
     const params: unknown[] = [];
 
-    if (filters.estudianteId) { query += ' AND estudiante_id = ?'; params.push(filters.estudianteId); }
+    const resolvedEstudianteId = await this.resolveEstudianteId(filters.estudianteId);
+    if (filters.estudianteId && resolvedEstudianteId === null) {
+      return [];
+    }
+
+    if (resolvedEstudianteId !== null) { query += ' AND estudiante_id = ?'; params.push(resolvedEstudianteId); }
     if (filters.cedula)       { query += ' AND cedula = ?';         params.push(filters.cedula); }
     if (filters.estado)       { query += ' AND estado = ?';         params.push(filters.estado); }
     if (filters.fechaInicio)  { query += ' AND fecha_actividad >= ?'; params.push(filters.fechaInicio); }
@@ -76,6 +103,12 @@ class ActividadModel {
   static async create(data: ActividadInput): Promise<ActividadRow | undefined> {
     const connection = await getPool().getConnection();
     try {
+      const activeMatriculacion = await MatriculacionModel.findActiveByEstudianteId(data.estudianteId);
+
+      if (!activeMatriculacion) {
+        throw new Error('El estudiante no tiene una matricula activa de TCU para registrar actividades');
+      }
+
       await connection.beginTransaction();
       await connection.query(
         'CALL sp_registrar_actividad(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, @actividad_id)',
@@ -88,6 +121,12 @@ class ActividadModel {
       );
       const [idResult] = await connection.query<RowDataPacket[]>('SELECT @actividad_id as id');
       const actividadId: number = idResult[0].id;
+
+      await connection.query(
+        'UPDATE actividades SET matriculacion_id = ? WHERE id = ?',
+        [activeMatriculacion.id, actividadId]
+      );
+
       await connection.commit();
       return this.findById(actividadId);
     } catch (error) {
@@ -127,10 +166,16 @@ class ActividadModel {
     return this.findById(id);
   }
 
-  static async findByEstudiante(estudianteId: number): Promise<ActividadRow[]> {
+  static async findByEstudiante(estudianteId: number | string): Promise<ActividadRow[]> {
+    const resolvedEstudianteId = await this.resolveEstudianteId(estudianteId);
+
+    if (resolvedEstudianteId === null) {
+      return [];
+    }
+
     const [rows] = await getPool().query<ActividadRow[]>(
       'SELECT * FROM vista_actividades_completas WHERE estudiante_id = ? ORDER BY fecha_actividad DESC',
-      [estudianteId]
+      [resolvedEstudianteId]
     );
     return rows;
   }
@@ -140,7 +185,7 @@ class ActividadModel {
     return true;
   }
 
-  static async getEstadisticas(estudianteId: number | null = null): Promise<RowDataPacket> {
+  static async getEstadisticas(estudianteId: number | string | null = null): Promise<RowDataPacket> {
     let query = `
       SELECT
         COUNT(*) as total,
@@ -152,7 +197,12 @@ class ActividadModel {
       FROM actividades
     `;
     const params: unknown[] = [];
-    if (estudianteId) { query += ' WHERE estudiante_id = ?'; params.push(estudianteId); }
+    const resolvedEstudianteId = await this.resolveEstudianteId(estudianteId ?? undefined);
+    if (estudianteId && resolvedEstudianteId === null) {
+      return { total: 0, aprobadas: 0, pendientes: 0, rechazadas: 0, total_horas: 0, promedio_horas: 0 } as RowDataPacket;
+    }
+
+    if (resolvedEstudianteId !== null) { query += ' WHERE estudiante_id = ?'; params.push(resolvedEstudianteId); }
 
     const [rows] = await getPool().query<RowDataPacket[]>(query, params);
     return rows[0];

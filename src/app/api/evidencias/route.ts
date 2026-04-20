@@ -1,10 +1,17 @@
 import EvidenciaModel from '@/lib/db/models/evidencia.model';
 import { created, fail, serverError } from '@/lib/http';
+import { registerAuditEvent } from '@/lib/services/audit.service';
+import { assertSameOrigin } from '@/lib/security/request-context';
 import { saveUploadedFile, validateEvidenceFile } from '@/lib/uploads';
 import type { NextRequest } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
+    const csrfError = assertSameOrigin(request);
+    if (csrfError) {
+      return fail(csrfError, 403);
+    }
+
     const formData = await request.formData();
 
     const actividadId = formData.get('actividadId') as string | null;
@@ -33,6 +40,15 @@ export async function POST(request: NextRequest) {
       const savedFile = await saveUploadedFile(archivo as File);
       evidencia = await EvidenciaModel.createArchivo(Number(actividadId), tipoEvidencia, savedFile);
     }
+
+    await registerAuditEvent({
+      tabla: 'evidencias',
+      accion: 'CREATE',
+      registroId: evidencia?.id ?? null,
+      descripcion: 'Creacion de evidencia',
+      after: evidencia,
+      request,
+    });
 
     return created(evidencia, 'Evidencia creada exitosamente');
   } catch (error) {

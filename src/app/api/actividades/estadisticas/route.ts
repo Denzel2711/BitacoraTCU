@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const estudianteId = searchParams.get('estudianteId');
-    const estadisticas = await ActividadModel.getEstadisticas(estudianteId ? Number(estudianteId) : null);
+    const estadisticas = await ActividadModel.getEstadisticas(estudianteId);
     return ok(estadisticas);
   } catch (error) {
     return serverError(error);

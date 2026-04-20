@@ -25,7 +25,30 @@ interface EstudianteInput {
 }
 
 class EstudianteModel {
+  static async findByIdentifier(identifier: string): Promise<EstudianteRow | undefined> {
+    const trimmedIdentifier = identifier.trim();
+
+    if (/^\d+$/.test(trimmedIdentifier)) {
+      return this.findById(Number(trimmedIdentifier));
+    }
+
+    return this.findByCedula(trimmedIdentifier);
+  }
+
   static async findAll(): Promise<EstudianteRow[]> {
+    const [rows] = await getPool().query<EstudianteRow[]>(
+      `SELECT e.*
+       FROM estudiantes e
+       INNER JOIN usuarios u ON u.estudiante_id = e.id AND u.activo = 1
+       INNER JOIN usuario_roles ur ON ur.usuario_id = u.id AND ur.rol = 'Estudiante'
+       INNER JOIN matriculaciones m ON m.estudiante_id = e.id AND m.estado = 'Activa' AND m.activo = 1
+       WHERE e.activo = TRUE
+       ORDER BY e.nombre, e.primer_apellido`
+    );
+    return rows;
+  }
+
+  static async findAllForTutor(): Promise<EstudianteRow[]> {
     const [rows] = await getPool().query<EstudianteRow[]>(
       'SELECT * FROM estudiantes WHERE activo = TRUE ORDER BY nombre, primer_apellido'
     );
@@ -34,7 +57,22 @@ class EstudianteModel {
 
   static async findByCedula(cedula: string): Promise<EstudianteRow | undefined> {
     const [rows] = await getPool().query<EstudianteRow[]>(
-      'SELECT * FROM estudiantes WHERE cedula = ? AND activo = TRUE',
+      `SELECT e.*
+       FROM estudiantes e
+       INNER JOIN usuarios u ON u.estudiante_id = e.id AND u.activo = 1
+       INNER JOIN usuario_roles ur ON ur.usuario_id = u.id AND ur.rol = 'Estudiante'
+       INNER JOIN matriculaciones m ON m.estudiante_id = e.id AND m.estado = 'Activa' AND m.activo = 1
+       WHERE e.cedula = ?
+         AND e.activo = TRUE
+       LIMIT 1`,
+      [cedula]
+    );
+    return rows[0];
+  }
+
+  static async findByCedulaForTutor(cedula: string): Promise<EstudianteRow | undefined> {
+    const [rows] = await getPool().query<EstudianteRow[]>(
+      'SELECT * FROM estudiantes WHERE cedula = ? AND activo = TRUE LIMIT 1',
       [cedula]
     );
     return rows[0];
@@ -51,10 +89,14 @@ class EstudianteModel {
   static async search(query: string): Promise<EstudianteRow[]> {
     const searchTerm = `%${query}%`;
     const [rows] = await getPool().query<EstudianteRow[]>(
-      `SELECT * FROM estudiantes
-       WHERE activo = TRUE
-       AND (cedula LIKE ? OR nombre LIKE ? OR primer_apellido LIKE ? OR segundo_apellido LIKE ?)
-       ORDER BY nombre, primer_apellido
+      `SELECT e.*
+       FROM estudiantes e
+       INNER JOIN usuarios u ON u.estudiante_id = e.id AND u.activo = 1
+       INNER JOIN usuario_roles ur ON ur.usuario_id = u.id AND ur.rol = 'Estudiante'
+       INNER JOIN matriculaciones m ON m.estudiante_id = e.id AND m.estado = 'Activa' AND m.activo = 1
+       WHERE e.activo = TRUE
+       AND (e.cedula LIKE ? OR e.nombre LIKE ? OR e.primer_apellido LIKE ? OR e.segundo_apellido LIKE ?)
+       ORDER BY e.nombre, e.primer_apellido
        LIMIT 20`,
       [searchTerm, searchTerm, searchTerm, searchTerm]
     );

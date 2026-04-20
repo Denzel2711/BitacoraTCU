@@ -1,7 +1,7 @@
 import type { ValidationResult, FormData } from '@/types';
 
 export const validateCedula = (cedula: string): boolean =>
-  Boolean(cedula && cedula.length >= 9);
+  Boolean(cedula && /^[A-Za-z0-9-]{9,30}$/.test(cedula.trim()));
 
 export const validateRequired = (value: string): boolean =>
   Boolean(value && value.trim() !== '');
@@ -66,7 +66,7 @@ export const validateHorasAcademicas = (horasAcumuladas: number, horasNuevas: nu
 export const validateForm = (formData: FormData): { valid: boolean; errores: string[] } => {
   const errores: string[] = [];
 
-  if (!validateCedula(formData.cedula as string)) errores.push('La cédula debe tener al menos 9 caracteres.');
+  if (!validateCedula(formData.cedula as string)) errores.push('La cédula debe tener entre 9 y 30 caracteres alfanuméricos.');
   if (!validateRequired(formData.fechaActividad as string)) errores.push('La fecha de la actividad es requerida.');
   if (!validateRequired(formData.tipoActividad as string)) errores.push('El tipo de actividad es requerido.');
   if (!validateRequired(formData.subtipoActividad as string)) errores.push('El subtipo de actividad es requerido.');

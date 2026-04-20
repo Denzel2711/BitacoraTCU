@@ -1,5 +1,5 @@
-import TCUFormView from '@/components/features/TCUFormView';
+import ProtectedFormPage from '@/components/features/ProtectedFormPage';
 
 export default function Home() {
-  return <TCUFormView />;
+  return <ProtectedFormPage />;
 }
