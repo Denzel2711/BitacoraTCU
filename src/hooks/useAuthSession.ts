@@ -46,11 +46,6 @@ export const useAuthSession = (): UseAuthSessionResult => {
 
   useEffect(() => {
     const initialize = async () => {
-      const storedSession = authService.getStoredSession();
-      if (storedSession) {
-        setSession(storedSession);
-      }
-
       await refresh();
       setLoading(false);
     };

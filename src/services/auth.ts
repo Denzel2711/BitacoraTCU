@@ -1,7 +1,6 @@
 import 'client-only';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
-const SESSION_STORAGE_KEY = 'bitacora_tcu_session';
 
 export interface AuthUser {
   id: number;
@@ -24,14 +23,6 @@ interface ApiResponse<T> {
   message?: string;
   data: T;
 }
-
-const saveSession = (session: AuthSession): void => {
-  localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
-};
-
-const clearSession = (): void => {
-  localStorage.removeItem(SESSION_STORAGE_KEY);
-};
 
 const parseResponse = async <T>(response: Response): Promise<T> => {
   const payload = (await response.json()) as ApiResponse<T>;
@@ -58,26 +49,11 @@ const postJson = async <T>(path: string, body?: Record<string, unknown>): Promis
 
 export const authService = {
   getStoredSession(): AuthSession | null {
-    try {
-      const raw = localStorage.getItem(SESSION_STORAGE_KEY);
-      if (!raw) {
-        return null;
-      }
-
-      const parsed = JSON.parse(raw) as AuthSession;
-      if (!parsed?.accessToken || !parsed?.user) {
-        return null;
-      }
-
-      return parsed;
-    } catch {
-      return null;
-    }
+    return null;
   },
 
   async login(identifier: string, password: string): Promise<AuthSession> {
     const session = await postJson<AuthSession>('/auth/login', { identifier, password });
-    saveSession(session);
     return session;
   },
 
@@ -89,29 +65,23 @@ export const authService = {
     roles?: Array<'Admin' | 'Academico' | 'Estudiante'>;
   }): Promise<AuthSession> {
     const session = await postJson<AuthSession>('/auth/usuarios', input);
-    saveSession(session);
     return session;
   },
 
   async refresh(): Promise<AuthSession> {
     const session = await postJson<AuthSession>('/auth/refresh');
-    saveSession(session);
     return session;
   },
 
   async logout(): Promise<void> {
-    try {
-      await postJson<null>('/auth/logout');
-    } finally {
-      clearSession();
-    }
+    await postJson<null>('/auth/logout');
   },
 
   setSession(session: AuthSession): void {
-    saveSession(session);
+    void session;
   },
 
   clearStoredSession(): void {
-    clearSession();
+    return;
   },
 };

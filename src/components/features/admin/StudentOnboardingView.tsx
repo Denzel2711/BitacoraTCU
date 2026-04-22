@@ -130,7 +130,7 @@ const StudentOnboardingView = () => {
                 Crear o reactivar estudiantes y abrir su ciclo activo de TCU sin perder historial anterior.
               </p>
             </div>
-            <Link href="/admin" className="text-sm font-semibold text-cyan-700 underline">
+            <Link href="/admin" className="px-4 py-2 rounded-xl bg-slate-700 text-white font-semibold hover:bg-slate-800">
               Volver al panel
             </Link>
           </div>
