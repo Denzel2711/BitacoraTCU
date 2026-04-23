@@ -7,6 +7,12 @@ import { assertSameOrigin } from '@/lib/security/request-context';
 import { saveUploadedFile, validateEvidenceFile } from '@/lib/uploads';
 import type { NextRequest } from 'next/server';
 
+const calculateHoursDifference = (horaInicio: string, horaFinal: string): number => {
+  const [horaIni, minIni] = horaInicio.split(':').map(Number);
+  const [horaFin, minFin] = horaFinal.split(':').map(Number);
+  return ((horaFin * 60 + minFin) - (horaIni * 60 + minIni)) / 60;
+};
+
 export async function GET(request: NextRequest) {
   try {
     const authError = requireAuthRole(request, ['Admin']);
@@ -62,8 +68,25 @@ export async function POST(request: NextRequest) {
     const evidenciaTexto = formData.get('evidenciaTexto') as string | null;
     const archivo = formData.get('archivo');
 
-    if (!estudianteId || !fechaActividad || !tipoActividad || !descripcionActividad) {
+    if (!estudianteId || !fechaActividad || !tipoActividad || !descripcionActividad || !horaInicio || !horaFinal) {
       return fail('Faltan campos requeridos', 400);
+    }
+
+    const horasNuevas = calculateHoursDifference(horaInicio, horaFinal);
+    if (horasNuevas <= 0) {
+      return fail('La hora de inicio debe ser menor a la hora final', 400);
+    }
+
+    if (horasNuevas > 8) {
+      return fail('No se pueden registrar más de 8 horas en una sola actividad', 400);
+    }
+
+    const horasAcumuladasDia = await ActividadModel.getHorasRegistradasPorDia(Number(estudianteId), fechaActividad);
+    if (horasAcumuladasDia + horasNuevas > 8) {
+      return fail(
+        `No se puede completar el registro. Ya tienes ${horasAcumuladasDia.toFixed(2)} horas para la fecha ${fechaActividad} y el límite diario es de 8 horas.`,
+        400
+      );
     }
 
     validateEvidenceFile(tipoEvidencia as 'Foto' | 'Documentos' | 'Texto' | 'No incluye', archivo as File | null);

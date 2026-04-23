@@ -11,6 +11,7 @@ export interface JwtPayload {
   name?: string | null;
   email?: string | null;
   username?: string | null;
+  requiereCambioPassword?: boolean;
   jti?: string;
   iat?: number;
   exp?: number;

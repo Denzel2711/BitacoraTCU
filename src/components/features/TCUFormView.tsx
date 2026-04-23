@@ -1,7 +1,9 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useFormData, useGeolocation, useFechaHoy } from '@/hooks';
+import { useToast } from '@/hooks';
 import { SUBTIPOS_PLANIFICACION, SUBTIPOS_EJECUCION, TIPOS_CAPACITACION } from '@/constants/form';
 import { formService } from '@/services/form';
 import { setupLeafletIcons } from '@/utils/map';
@@ -13,11 +15,18 @@ import InteractiveMap from '@/components/features/map/InteractiveMap';
 interface TCUFormViewProps {
   accessToken: string;
   estudianteSesionId: number | null;
+  sessionUser: {
+    nombreCompleto: string;
+    email: string;
+    roles: Array<'Admin' | 'Academico' | 'Estudiante'>;
+  };
+  onLogout: () => void;
 }
 
-const TCUFormView = ({ accessToken, estudianteSesionId }: TCUFormViewProps) => {
+const TCUFormView = ({ accessToken, estudianteSesionId, sessionUser, onLogout }: TCUFormViewProps) => {
   const { formData, resetForm, updateFormData } = useFormData();
-  const { mapCenter, handleGetLocation, handleMapClick } = useGeolocation(formData, updateFormData);
+  const { mapCenter, handleMapClick } = useGeolocation(formData, updateFormData);
+  const { error: toastError, success: toastSuccess } = useToast();
   const fechaHoy = useFechaHoy();
   const [cedulaSearch, setCedulaSearch] = useState('');
   const [maxFechaActividad] = useState(() => new Date().toISOString().split('T')[0]);
@@ -49,7 +58,7 @@ const TCUFormView = ({ accessToken, estudianteSesionId }: TCUFormViewProps) => {
         });
         setCedulaSearch(estudiante.cedula);
       } catch {
-        alert('No fue posible cargar los datos del estudiante en sesión');
+        toastError('No fue posible cargar los datos del estudiante en sesión');
       }
     };
 
@@ -63,18 +72,18 @@ const TCUFormView = ({ accessToken, estudianteSesionId }: TCUFormViewProps) => {
 
     if (!validacion.valid) {
       const mensajeErrores = validacion.errores.join('\n\n');
-      alert(`Por favor corrija los siguientes errores:\n\n${mensajeErrores}`);
+      toastError('Corrija los errores del formulario', mensajeErrores);
       return;
     }
 
     try {
       if (!accessToken) {
-        alert('Debe iniciar sesión para enviar el formulario.');
+        toastError('Debe iniciar sesión para enviar el formulario.');
         return;
       }
 
       await formService.submitForm(formData, accessToken, estudianteSesionId ?? undefined);
-      alert('Formulario enviado exitosamente');
+      toastSuccess('Formulario enviado exitosamente');
       resetForm();
       if (estudianteSesionId) {
         const estudiante = await formService.obtenerEstudiantePorId(estudianteSesionId);
@@ -90,7 +99,7 @@ const TCUFormView = ({ accessToken, estudianteSesionId }: TCUFormViewProps) => {
         setCedulaSearch(estudiante.cedula);
       }
     } catch {
-      alert('Error al enviar el formulario');
+      toastError('Error al enviar el formulario');
     }
   };
 
@@ -119,6 +128,30 @@ const TCUFormView = ({ accessToken, estudianteSesionId }: TCUFormViewProps) => {
       <div className="max-w-5xl mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden border border-cyan-200">
 
         <FormHeader />
+
+        <div className="px-10 pt-8">
+          <div className="bg-white border border-cyan-200 rounded-xl px-4 py-3 flex items-center justify-between shadow-sm">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">{sessionUser.nombreCompleto}</p>
+              <p className="text-xs text-slate-600">{sessionUser.email} · {sessionUser.roles.join(', ')}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/mis-actividades"
+                className="px-3 py-2 rounded-lg bg-cyan-600 text-white text-sm font-semibold hover:bg-cyan-700"
+              >
+                Ver mis actividades
+              </Link>
+              <button
+                type="button"
+                onClick={onLogout}
+                className="px-3 py-2 rounded-lg bg-slate-700 text-white text-sm font-semibold hover:bg-slate-800"
+              >
+                Cerrar sesión
+              </button>
+            </div>
+          </div>
+        </div>
 
         <form onSubmit={handleSubmit} className="p-10 space-y-10">
 
@@ -472,28 +505,16 @@ const TCUFormView = ({ accessToken, estudianteSesionId }: TCUFormViewProps) => {
                 </p>
                 <ul className="text-sm text-gray-700 list-disc pl-5 space-y-1">
                   <li>Por favor, proporcione la ubicación geográfica donde se llevó a cabo la actividad.</li>
-                  <li>Utilice la función de geolocalización de su dispositivo para registrar las coordenadas. Para actividades realizadas en su hogar proporcione únicamente el nombre de la comunidad.</li>
+                  <li>Registre manualmente las coordenadas desde el mapa o describa la ubicación con detalle en el campo de texto.</li>
                 </ul>
                 <p className="text-sm text-gray-700 mt-3 mb-2">
                   <strong>Instrucciones:</strong>
                 </p>
                 <ul className="text-sm text-gray-700 list-disc pl-5 space-y-1">
-                  <li>Asegúrese de tener la ubicación activada en su dispositivo para una precisión óptima.</li>
-                  <li>Toque el icono de ubicación en su dispositivo para registrar automáticamente las coordenadas.</li>
-                  <li>Si experimenta problemas con la geolocalización, describa la ubicación con detalles en el campo de texto.</li>
+                  <li>Seleccione la ubicación manualmente en el mapa para registrar latitud y longitud.</li>
+                  <li>Si no puede ubicar con precisión el punto, describa la referencia geográfica en el campo de texto.</li>
                 </ul>
               </div>
-
-              <button
-                type="button"
-                onClick={handleGetLocation}
-                className="mb-4 bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 text-white font-semibold py-3 px-6 rounded-xl flex items-center space-x-2 transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105"
-              >
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-                </svg>
-                <span>Obtener Ubicación GPS</span>
-              </button>
 
               {formData.ubicacionLat && formData.ubicacionLng && (
                 <div className="bg-white p-4 rounded-lg border-l-4 border-orange-500 mb-4 shadow-sm">

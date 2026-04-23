@@ -185,6 +185,19 @@ class ActividadModel {
     return true;
   }
 
+  static async getHorasRegistradasPorDia(estudianteId: number, fechaActividad: string): Promise<number> {
+    const [rows] = await getPool().query<RowDataPacket[]>(
+      `SELECT COALESCE(SUM(horas_trabajadas), 0) AS total_horas
+       FROM actividades
+       WHERE estudiante_id = ?
+         AND fecha_actividad = ?
+         AND estado IN ('Pendiente', 'Aprobada')`,
+      [estudianteId, fechaActividad]
+    );
+
+    return Number(rows[0]?.total_horas || 0);
+  }
+
   static async getEstadisticas(estudianteId: number | string | null = null): Promise<RowDataPacket> {
     let query = `
       SELECT

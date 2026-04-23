@@ -12,6 +12,7 @@ export interface AuthUser {
   nombreCompleto: string;
   roles: Array<'Admin' | 'Academico' | 'Estudiante'>;
   estudianteId: number | null;
+  requiereCambioPassword: boolean;
 }
 
 export const generateRefreshToken = (): string => randomBytes(48).toString('base64url');
@@ -56,6 +57,7 @@ export const getSessionUserByRefreshHash = async (refreshTokenHash: string): Pro
     rol: 'Admin' | 'Academico' | 'Estudiante';
     estudiante_id: number | null;
     roles: string | null;
+    requiere_cambio_password: number;
   }
 
   const [rows] = await getPool().query<
@@ -68,6 +70,7 @@ export const getSessionUserByRefreshHash = async (refreshTokenHash: string): Pro
        u.nombre_completo,
        u.rol,
        u.estudiante_id,
+       u.requiere_cambio_password,
        (
          SELECT GROUP_CONCAT(ur.rol ORDER BY FIELD(ur.rol, 'Admin', 'Academico', 'Estudiante') SEPARATOR ',')
          FROM usuario_roles ur
@@ -101,6 +104,7 @@ export const getSessionUserByRefreshHash = async (refreshTokenHash: string): Pro
     nombreCompleto: user.nombre_completo,
     roles,
     estudianteId: user.estudiante_id,
+    requiereCambioPassword: Boolean(user.requiere_cambio_password),
   };
 };
 

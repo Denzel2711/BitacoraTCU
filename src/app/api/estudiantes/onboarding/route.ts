@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
           intentos_fallidos,
           requiere_cambio_password,
           fecha_cambio_password
-        ) VALUES (?, ?, ?, ?, 'Estudiante', 1, ?, 0, 0, NOW())`,
+        ) VALUES (?, ?, ?, ?, 'Estudiante', 1, ?, 0, 1, NULL)`,
         [
           body.nombreUsuario.trim(),
           body.email.trim().toLowerCase(),
@@ -143,7 +143,9 @@ export async function POST(request: NextRequest) {
              activo = 1,
              estudiante_id = ?,
              intentos_fallidos = 0,
-             bloqueado_hasta = NULL
+             bloqueado_hasta = NULL,
+             requiere_cambio_password = 1,
+             fecha_cambio_password = NULL
          WHERE id = ?`,
         [
           body.nombreUsuario.trim(),

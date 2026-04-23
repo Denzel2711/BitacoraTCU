@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { formService } from '@/services/form';
-import { ESTUDIANTES_MOCK } from '@/constants/form';
 import type { Estudiante } from '@/types';
 
 export const useEstudiantes = () => {
@@ -15,9 +14,9 @@ export const useEstudiantes = () => {
       try {
         setLoading(true);
         const data = await formService.getEstudiantes();
-        setEstudiantes(data.length > 0 ? data : ESTUDIANTES_MOCK);
+        setEstudiantes(data);
       } catch {
-        setEstudiantes(ESTUDIANTES_MOCK);
+        setEstudiantes([]);
       } finally {
         setLoading(false);
       }

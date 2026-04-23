@@ -4,6 +4,8 @@ import { fail, ok, serverError } from '@/lib/http';
 import { assertSameOrigin } from '@/lib/security/request-context';
 import { requireAuthRole } from '@/lib/auth/authorization';
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 const ALLOWED_ROLES = ['Admin', 'Academico', 'Estudiante'] as const;
 type AllowedRole = (typeof ALLOWED_ROLES)[number];
 
@@ -34,9 +36,26 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const { id } = await params;
+    const userId = Number(id);
+
+    if (!Number.isFinite(userId) || userId <= 0) {
+      return fail('ID de usuario invalido', 400);
+    }
+
     const body = await request.json();
+    const nombreUsuario = String(body?.nombreUsuario ?? body?.nombre_usuario ?? '').trim();
+    const email = String(body?.email ?? '').trim().toLowerCase();
+    const nombreCompleto = String(body?.nombreCompleto ?? body?.nombre_completo ?? '').trim();
     const roles = sanitizeRoles(body?.roles ?? body?.rol);
     const activo = typeof body?.activo === 'boolean' ? body.activo : Boolean(body?.activo);
+
+    if (!nombreUsuario || !email || !nombreCompleto) {
+      return fail('Usuario, nombre completo y email son requeridos', 400);
+    }
+
+    if (!EMAIL_REGEX.test(email)) {
+      return fail('El email no tiene un formato valido', 400);
+    }
 
     if (!roles.length) {
       return fail('Debe indicar al menos un rol valido', 400);
@@ -45,7 +64,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (roles.includes('Estudiante')) {
       const [linkedStudentRows] = await getPool().query(
         'SELECT estudiante_id FROM usuarios WHERE id = ? LIMIT 1',
-        [Number(id)]
+        [userId]
       );
 
       const linkedStudent = (linkedStudentRows as Array<{ estudiante_id: number | null }>)[0]?.estudiante_id;
@@ -56,16 +75,20 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     await getPool().query(
       `UPDATE usuarios
-       SET rol = ?, activo = ?
+       SET nombre_usuario = ?,
+           email = ?,
+           nombre_completo = ?,
+           rol = ?,
+           activo = ?
        WHERE id = ?`,
-      [roles[0], activo ? 1 : 0, Number(id)]
+      [nombreUsuario, email, nombreCompleto, roles[0], activo ? 1 : 0, userId]
     );
 
-    await getPool().query('DELETE FROM usuario_roles WHERE usuario_id = ?', [Number(id)]);
+    await getPool().query('DELETE FROM usuario_roles WHERE usuario_id = ?', [userId]);
     await getPool().query(
       `INSERT INTO usuario_roles (usuario_id, rol)
        VALUES ${roles.map(() => '(?, ?)').join(', ')}`,
-      roles.flatMap((role) => [Number(id), role])
+      roles.flatMap((role) => [userId, role])
     );
 
     const [rows] = await getPool().query(
@@ -88,7 +111,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
        FROM usuarios u
        WHERE u.id = ?
        LIMIT 1`,
-      [Number(id)]
+      [userId]
     );
 
     const user = (rows as Array<{ roles?: string | string[]; [key: string]: unknown }>)[0];
@@ -102,6 +125,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     return ok(user ?? null, { message: 'Usuario actualizado exitosamente' });
   } catch (error) {
+    if ((error as NodeJS.ErrnoException & { code?: string })?.code === 'ER_DUP_ENTRY') {
+      return fail('El nombre de usuario o email ya existe', 409);
+    }
+
     return serverError(error);
   }
 }

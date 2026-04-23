@@ -43,15 +43,14 @@ export const validateCantidadHoras = (
   horaFinal: string,
   subtipoActividad: string
 ): ValidationResult => {
+  void subtipoActividad;
   if (!horaInicio || !horaFinal) return { valid: false, message: 'Las horas son requeridas' };
 
   const diferenciaHoras = calcularDiferenciaHoras(horaInicio, horaFinal);
-  const esGira = subtipoActividad?.toLowerCase().includes('gira') ||
-                 subtipoActividad?.toLowerCase().includes('transporte');
-  const maxHoras = esGira ? 12 : 8;
+  const maxHoras = 8;
 
   if (diferenciaHoras > maxHoras)
-    return { valid: false, message: `No se pueden registrar más de ${maxHoras} horas al día${esGira ? ' (gira/transporte)' : ''}` };
+    return { valid: false, message: `No se pueden registrar más de ${maxHoras} horas al día` };
 
   return { valid: true, horas: diferenciaHoras };
 };
@@ -81,6 +80,13 @@ export const validateForm = (formData: FormData): { valid: boolean; errores: str
   if (formData.horaInicio && formData.horaFinal) {
     const horasResult = validateHoras(formData.horaInicio as string, formData.horaFinal as string);
     if (!horasResult.valid) errores.push(horasResult.message!);
+
+    const cantidadHorasResult = validateCantidadHoras(
+      formData.horaInicio as string,
+      formData.horaFinal as string,
+      formData.subtipoActividad as string
+    );
+    if (!cantidadHorasResult.valid) errores.push(cantidadHorasResult.message!);
   }
 
   return { valid: errores.length === 0, errores };

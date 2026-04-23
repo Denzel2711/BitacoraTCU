@@ -9,12 +9,17 @@ export interface AuthUser {
   email: string;
   roles: Array<'Admin' | 'Academico' | 'Estudiante'>;
   estudianteId: number | null;
+  requiereCambioPassword: boolean;
 }
 
 export interface AuthSession {
   accessToken: string;
   accessTokenExpiresAt: string;
   user: AuthUser;
+}
+
+export interface AuthCreatedUser {
+  user: AuthUser & { id: number };
 }
 
 interface ApiResponse<T> {
@@ -63,9 +68,8 @@ export const authService = {
     nombreCompleto: string;
     password: string;
     roles?: Array<'Admin' | 'Academico' | 'Estudiante'>;
-  }): Promise<AuthSession> {
-    const session = await postJson<AuthSession>('/auth/usuarios', input);
-    return session;
+  }): Promise<AuthCreatedUser> {
+    return postJson<AuthCreatedUser>('/auth/usuarios', input);
   },
 
   async refresh(): Promise<AuthSession> {
@@ -75,6 +79,20 @@ export const authService = {
 
   async logout(): Promise<void> {
     await postJson<null>('/auth/logout');
+  },
+
+  async changePassword(accessToken: string, currentPassword: string, newPassword: string): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/auth/password/change`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      credentials: 'include',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+
+    await parseResponse<null>(response);
   },
 
   setSession(session: AuthSession): void {

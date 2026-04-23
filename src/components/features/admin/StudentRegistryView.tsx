@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import FormHeader from '@/components/layout/FormHeader';
+import SectionHeader from '@/components/layout/SectionHeader';
 import { useAuthSession } from '@/hooks';
 import { adminService, type AdminAcademic, type AdminStudent } from '@/services/admin';
 
@@ -19,6 +19,11 @@ const StudentRegistryView = () => {
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
+      router.replace('/auth');
+      return;
+    }
+
+    if (!authLoading && isAuthenticated && session?.user.requiereCambioPassword) {
       router.replace('/auth');
       return;
     }
@@ -93,7 +98,11 @@ const StudentRegistryView = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-cyan-50 to-orange-50 py-12 px-4">
       <div className="max-w-7xl mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden border border-cyan-200">
-        <FormHeader />
+        <SectionHeader
+          title="Estudiantes Registrados"
+          subtitle="Revise y actualice la información general de estudiantes en la plataforma."
+          tone="cyan"
+        />
 
         <div className="p-8 space-y-6">
           <div className="flex flex-wrap items-start justify-between gap-3">

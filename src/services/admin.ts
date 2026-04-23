@@ -104,7 +104,13 @@ export const adminService = {
     });
   },
 
-  updateUser(accessToken: string, userId: number, payload: { roles: Array<'Admin' | 'Academico' | 'Estudiante'>; activo: boolean }): Promise<unknown> {
+  updateUser(accessToken: string, userId: number, payload: {
+    nombreUsuario: string;
+    email: string;
+    nombreCompleto: string;
+    roles: Array<'Admin' | 'Academico' | 'Estudiante'>;
+    activo: boolean;
+  }): Promise<unknown> {
     return fetchJson(`/auth/usuarios/${userId}`, accessToken, {
       method: 'PUT',
       body: JSON.stringify(payload),

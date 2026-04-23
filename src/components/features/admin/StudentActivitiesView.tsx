@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import FormHeader from '@/components/layout/FormHeader';
-import { useAuthSession } from '@/hooks';
+import SectionHeader from '@/components/layout/SectionHeader';
+import { useAuthSession, useToast } from '@/hooks';
 import { adminService, type AdminActivity } from '@/services/admin';
 
 type EvidenceItem = {
@@ -32,13 +32,18 @@ interface GroupedActivities {
 const StudentActivitiesView = ({ estudianteId }: StudentActivitiesViewProps) => {
   const router = useRouter();
   const { session, loading: authLoading, isAuthenticated } = useAuthSession();
+  const { error: toastError } = useToast();
   const [activities, setActivities] = useState<AdminActivity[]>([]);
   const [evidenceMap, setEvidenceMap] = useState<Record<number, EvidenceItem[]>>({});
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
+      router.replace('/auth');
+      return;
+    }
+
+    if (!authLoading && isAuthenticated && session?.user.requiereCambioPassword) {
       router.replace('/auth');
       return;
     }
@@ -57,7 +62,6 @@ const StudentActivitiesView = ({ estudianteId }: StudentActivitiesViewProps) => 
       }
 
       setLoading(true);
-      setError('');
       try {
         const rows = await adminService.getStudentActivities(session.accessToken, estudianteId);
         setActivities(rows);
@@ -70,8 +74,8 @@ const StudentActivitiesView = ({ estudianteId }: StudentActivitiesViewProps) => 
         );
 
         setEvidenceMap(Object.fromEntries(evidenceEntries));
-      } catch (loadError) {
-        setError((loadError as Error)?.message || 'No fue posible cargar actividades');
+      } catch {
+        toastError('No fue posible cargar actividades. Intente nuevamente más tarde.');
       } finally {
         setLoading(false);
       }
@@ -122,7 +126,11 @@ const StudentActivitiesView = ({ estudianteId }: StudentActivitiesViewProps) => 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-cyan-50 to-orange-50 py-12 px-4">
       <div className="max-w-6xl mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden border border-cyan-200">
-        <FormHeader />
+        <SectionHeader
+          title="Actividades del Estudiante"
+          subtitle="Consulte el historial de actividades y evidencias organizadas por período."
+          tone="cyan"
+        />
 
         <div className="p-8 space-y-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -198,7 +206,9 @@ const StudentActivitiesView = ({ estudianteId }: StudentActivitiesViewProps) => 
                         <article key={activity.id} className="rounded-xl border border-slate-200 p-4 bg-slate-50 hover:bg-slate-100 transition">
                           <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                             <div>
-                              <p className="font-semibold text-slate-900">{(activity as any).fecha_actividad} · {(activity as any).tipo_actividad}</p>
+                              <p className="font-semibold text-slate-900">
+                                {new Date(activity.fecha_actividad).toLocaleDateString('es-ES', { timeZone: 'UTC' })} · {activity.tipo_actividad}
+                              </p>
                               <p className="text-xs text-slate-500 mt-1">{(activity as any).subtipo_actividad}</p>
                             </div>
                             <div className="flex items-center gap-2">
@@ -239,7 +249,6 @@ const StudentActivitiesView = ({ estudianteId }: StudentActivitiesViewProps) => 
             </div>
           )}
 
-          {error && <p className="text-sm font-semibold text-red-600">{error}</p>}
         </div>
       </div>
     </div>

@@ -4,18 +4,17 @@ import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import FormHeader from '@/components/layout/FormHeader';
-import { useAuthSession } from '@/hooks';
+import SectionHeader from '@/components/layout/SectionHeader';
+import { useAuthSession, useToast } from '@/hooks';
 import { adminService, type AdminAcademic } from '@/services/admin';
 import { onboardingService } from '@/services/onboarding';
 
 const StudentOnboardingView = () => {
   const router = useRouter();
   const { session, loading: authLoading, isAuthenticated } = useAuthSession();
+  const { error: toastError, success: toastSuccess } = useToast();
   const [loading, setLoading] = useState(false);
   const [loadingAcademicos, setLoadingAcademicos] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [academicos, setAcademicos] = useState<AdminAcademic[]>([]);
 
   const [cedula, setCedula] = useState('');
@@ -35,6 +34,12 @@ const StudentOnboardingView = () => {
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.replace('/auth');
+      return;
+    }
+
+    if (!authLoading && isAuthenticated && session?.user.requiereCambioPassword) {
+      router.replace('/auth');
+      return;
     }
 
     const roles = session?.user.roles || [];
@@ -55,8 +60,8 @@ const StudentOnboardingView = () => {
       try {
         const rows = await adminService.getAcademicos(session.accessToken);
         setAcademicos(rows);
-      } catch (loadError) {
-        setError((loadError as Error)?.message || 'No se pudo cargar la lista de académicos');
+      } catch {
+        toastError('No se pudo cargar la lista de académicos. Intente nuevamente más tarde.');
       } finally {
         setLoadingAcademicos(false);
       }
@@ -83,8 +88,6 @@ const StudentOnboardingView = () => {
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
     setLoading(true);
 
     try {
@@ -108,10 +111,10 @@ const StudentOnboardingView = () => {
         reinicioDesdeCero,
       }, session.accessToken);
 
-      setSuccess('Estudiante registrado y habilitado para iniciar sesión.');
+      toastSuccess('Estudiante registrado y habilitado para iniciar sesión.');
       resetForm();
-    } catch (submitError) {
-      setError((submitError as Error)?.message || 'No se pudo completar el registro del estudiante');
+    } catch {
+      toastError('No se pudo completar el registro del estudiante. Revise los datos e intente nuevamente.');
     } finally {
       setLoading(false);
     }
@@ -120,7 +123,11 @@ const StudentOnboardingView = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-cyan-50 to-orange-50 py-12 px-4">
       <div className="max-w-5xl mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden border border-cyan-200">
-        <FormHeader />
+        <SectionHeader
+          title="Registro Manual de Estudiantes"
+          subtitle="Complete los datos requeridos para habilitar o reactivar cuentas estudiantiles."
+          tone="orange"
+        />
 
         <div className="p-8 space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -190,8 +197,6 @@ const StudentOnboardingView = () => {
             </div>
           </form>
 
-          {error && <p className="text-sm font-semibold text-red-600">{error}</p>}
-          {success && <p className="text-sm font-semibold text-green-700">{success}</p>}
         </div>
       </div>
     </div>

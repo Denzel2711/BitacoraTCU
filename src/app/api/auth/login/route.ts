@@ -27,6 +27,7 @@ interface UsuarioLoginRow extends RowDataPacket {
   activo: number;
   intentos_fallidos: number;
   bloqueado_hasta: string | Date | null;
+  requiere_cambio_password: number;
 }
 
 const isLocked = (bloqueadoHasta: string | Date | null): boolean => {
@@ -65,6 +66,7 @@ export async function POST(request: NextRequest) {
          u.activo,
          u.intentos_fallidos,
          u.bloqueado_hasta,
+         u.requiere_cambio_password,
          m.id AS matricula_activa_id
        FROM usuarios u
        LEFT JOIN matriculaciones m
@@ -131,6 +133,7 @@ export async function POST(request: NextRequest) {
         name: usuario.nombre_completo,
         email: usuario.email,
         username: usuario.nombre_usuario,
+        requiereCambioPassword: Boolean(usuario.requiere_cambio_password),
       },
       accessSecret,
       accessExpiresIn
@@ -170,6 +173,7 @@ export async function POST(request: NextRequest) {
             email: usuario.email,
             roles,
             estudianteId: usuario.estudiante_id,
+            requiereCambioPassword: Boolean(usuario.requiere_cambio_password),
           },
         },
       },

@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
         name: sessionUser.nombreCompleto,
         email: sessionUser.email,
         username: sessionUser.nombreUsuario,
+        requiereCambioPassword: sessionUser.requiereCambioPassword,
       },
       accessSecret,
       accessExpiresIn

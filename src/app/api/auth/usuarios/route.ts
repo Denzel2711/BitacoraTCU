@@ -1,19 +1,9 @@
-import { NextResponse } from 'next/server';
 import type { ResultSetHeader } from 'mysql2';
 import { getPool } from '@/lib/db';
-import { fail, ok, serverError } from '@/lib/http';
-import { signJwt } from '@/lib/auth/jwt';
+import { created, fail, ok, serverError } from '@/lib/http';
 import { hashPassword } from '@/lib/auth/password';
 import { assertSameOrigin } from '@/lib/security/request-context';
 import { requireAuthRole } from '@/lib/auth/authorization';
-import {
-  buildRefreshCookieOptions,
-  generateRefreshToken,
-  hashToken,
-  saveRefreshSession,
-  toExpiryDate,
-} from '@/lib/auth/session';
-import { getRequestContext } from '@/lib/security/request-context';
 import type { NextRequest } from 'next/server';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -129,7 +119,7 @@ export async function POST(request: NextRequest) {
         intentos_fallidos,
         requiere_cambio_password,
         fecha_cambio_password
-      ) VALUES (?, ?, ?, ?, ?, 1, 0, 0, NOW())`,
+      ) VALUES (?, ?, ?, ?, ?, 1, 0, 1, NULL)`,
       [nombreUsuario, email, passwordHash, nombreCompleto, roles[0]]
     );
 
@@ -139,65 +129,20 @@ export async function POST(request: NextRequest) {
       roles.flatMap((role) => [result.insertId, role])
     );
 
-    const accessSecret = process.env.JWT_SECRET || 'bitacora-tcu-dev-secret';
-    const accessExpiresIn = process.env.JWT_ACCESS_EXPIRES_IN || '15m';
-    const refreshExpiresIn = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
-
-    const { token: accessToken, expiresAt: accessTokenExpiresAt } = signJwt(
+    return created(
       {
-        sub: String(result.insertId),
-        tokenType: 'access',
-        role: roles[0],
-        roles,
-        estudianteId: null,
-        name: nombreCompleto,
-        email,
-        username: nombreUsuario,
-      },
-      accessSecret,
-      accessExpiresIn
-    );
-
-    const refreshToken = generateRefreshToken();
-    const refreshTokenHash = hashToken(refreshToken);
-    const refreshExpiresAt = toExpiryDate(refreshExpiresIn);
-    const requestContext = getRequestContext(request);
-
-    await saveRefreshSession(
-      result.insertId,
-      refreshTokenHash,
-      refreshExpiresAt,
-      requestContext.ip,
-      requestContext.userAgent
-    );
-
-    const response = NextResponse.json(
-      {
-        success: true,
-        message: 'Usuario creado exitosamente',
-        data: {
-          accessToken,
-          accessTokenExpiresAt,
-          user: {
-            id: result.insertId,
-            nombreUsuario,
-            nombreCompleto,
-            email,
-            roles,
-            estudianteId: null,
-          },
+        user: {
+          id: result.insertId,
+          nombreUsuario,
+          nombreCompleto,
+          email,
+          roles,
+          estudianteId: null,
+          requiereCambioPassword: true,
         },
       },
-      { status: 201 }
+      'Usuario creado exitosamente'
     );
-
-    response.cookies.set(
-      'refresh_token',
-      refreshToken,
-      buildRefreshCookieOptions(Math.floor((refreshExpiresAt.getTime() - Date.now()) / 1000))
-    );
-
-    return response;
   } catch (error) {
     if ((error as NodeJS.ErrnoException & { code?: string })?.code === 'ER_DUP_ENTRY') {
       return fail('El nombre de usuario o email ya existe', 409);

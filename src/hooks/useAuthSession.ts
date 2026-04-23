@@ -17,9 +17,10 @@ interface UseAuthSessionResult {
   error: string;
   clearError: () => void;
   login: (identifier: string, password: string) => Promise<AuthSession | null>;
-  register: (input: RegisterInput) => Promise<AuthSession | null>;
+  register: (input: RegisterInput) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<AuthSession | null>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<boolean>;
   isAuthenticated: boolean;
 }
 
@@ -61,23 +62,22 @@ export const useAuthSession = (): UseAuthSessionResult => {
       setError('');
       return nextSession;
     } catch (loginError) {
-      setError((loginError as Error)?.message || 'No fue posible iniciar sesion');
+      const message = (loginError as Error)?.message || 'No fue posible iniciar sesion';
+      setError(message);
       return null;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const register = useCallback(async (input: RegisterInput) => {
+  const register = useCallback(async (input: RegisterInput): Promise<void> => {
     setLoading(true);
     try {
-      const nextSession = await authService.register(input);
-      setSession(nextSession);
+      await authService.register(input);
       setError('');
-      return nextSession;
     } catch (registerError) {
-      setError((registerError as Error)?.message || 'No fue posible registrar el usuario');
-      return null;
+      const message = (registerError as Error)?.message || 'No fue posible registrar el usuario';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -90,11 +90,34 @@ export const useAuthSession = (): UseAuthSessionResult => {
       setSession(null);
       setError('');
     } catch (logoutError) {
-      setError((logoutError as Error)?.message || 'No fue posible cerrar sesion');
+      const message = (logoutError as Error)?.message || 'No fue posible cerrar sesion';
+      setError(message);
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const changePassword = useCallback(async (currentPassword: string, newPassword: string): Promise<boolean> => {
+    if (!session?.accessToken) {
+      setError('Se requiere una sesion activa para cambiar la contraseña');
+      return false;
+    }
+
+    setLoading(true);
+    try {
+      await authService.changePassword(session.accessToken, currentPassword, newPassword);
+      const nextSession = await authService.refresh();
+      setSession(nextSession);
+      setError('');
+      return true;
+    } catch (changePasswordError) {
+      const message = (changePasswordError as Error)?.message || 'No fue posible actualizar la contraseña';
+      setError(message);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [session]);
 
   return useMemo(
     () => ({
@@ -106,8 +129,9 @@ export const useAuthSession = (): UseAuthSessionResult => {
       register,
       logout,
       refresh,
+      changePassword,
       isAuthenticated: Boolean(session?.accessToken),
     }),
-    [session, loading, error, clearError, login, register, logout, refresh]
+    [session, loading, error, clearError, login, register, logout, refresh, changePassword]
   );
 };

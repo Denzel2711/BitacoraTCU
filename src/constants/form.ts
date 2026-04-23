@@ -1,11 +1,4 @@
-import type { Estudiante, FormData } from '@/types';
-
-// Datos de ejemplo de estudiantes (fallback cuando la API no está disponible)
-export const ESTUDIANTES_MOCK: Estudiante[] = [
-  { cedula: '123456789', nombre: 'Juan',   primerApellido: 'Pérez',     segundoApellido: 'González', carrera: 'Ingeniería en Software', academicoACargo: 'Dr. Carlos Ramírez', sede: 'San Carlos' },
-  { cedula: '987654321', nombre: 'María',  primerApellido: 'Rodríguez', segundoApellido: 'Mora',     carrera: 'Administración',          academicoACargo: 'Dr. Carlos Ramírez', sede: 'Atenas' },
-  { cedula: '456789123', nombre: 'Carlos', primerApellido: 'López',     segundoApellido: 'Salas',    carrera: 'Turismo',                 academicoACargo: 'Dr. Carlos Ramírez', sede: 'Central' },
-];
+import type { FormData } from '@/types';
 
 export const SUBTIPOS_PLANIFICACION: string[] = [
   'Inducción, sensibilización y capacitación sobre el proyecto',

@@ -3,20 +3,20 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import FormHeader from '@/components/layout/FormHeader';
-import { useAuthSession } from '@/hooks';
+import SectionHeader from '@/components/layout/SectionHeader';
+import { useAuthSession, useToast } from '@/hooks';
 import { adminService, type AdminUser } from '@/services/admin';
 
 const ROLE_OPTIONS: Array<'Admin' | 'Academico' | 'Estudiante'> = ['Admin', 'Academico', 'Estudiante'];
+const CREATE_ROLE_OPTIONS: Array<'Admin' | 'Academico'> = ['Admin', 'Academico'];
 
 const UserManagementView = () => {
   const router = useRouter();
   const { session, loading: authLoading, isAuthenticated } = useAuthSession();
+  const { error: toastError, success: toastSuccess } = useToast();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [savingUserId, setSavingUserId] = useState<number | null>(null);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
 
   const [form, setForm] = useState({
     nombreUsuario: '',
@@ -28,6 +28,11 @@ const UserManagementView = () => {
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
+      router.replace('/auth');
+      return;
+    }
+
+    if (!authLoading && isAuthenticated && session?.user.requiereCambioPassword) {
       router.replace('/auth');
       return;
     }
@@ -48,8 +53,8 @@ const UserManagementView = () => {
       try {
         const rows = await adminService.getUsers(session.accessToken);
         setUsers(rows);
-      } catch (loadError) {
-        setError((loadError as Error)?.message || 'No fue posible cargar usuarios');
+      } catch {
+        toastError('No fue posible cargar usuarios. Intente nuevamente más tarde.');
       } finally {
         setLoading(false);
       }
@@ -67,7 +72,7 @@ const UserManagementView = () => {
     setUsers(rows);
   };
 
-  const toggleFormRole = (role: 'Admin' | 'Academico' | 'Estudiante') => {
+  const toggleFormRole = (role: 'Admin' | 'Academico') => {
     setForm((prev) => {
       const exists = prev.roles.includes(role);
       const nextRoles = exists ? prev.roles.filter((r) => r !== role) : [...prev.roles, role];
@@ -95,20 +100,13 @@ const UserManagementView = () => {
 
   const handleCreateUser = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setError('');
-    setSuccess('');
 
     if (!session?.accessToken) {
       return;
     }
 
     if (!form.roles.length) {
-      setError('Seleccione al menos un rol para el usuario.');
-      return;
-    }
-
-    if (form.roles.includes('Estudiante')) {
-      setError('Las cuentas de estudiante se crean desde Onboarding para vincularlas al registro académico.');
+      toastError('Seleccione al menos un rol para el usuario.');
       return;
     }
 
@@ -116,37 +114,37 @@ const UserManagementView = () => {
       await adminService.createUser(session.accessToken, form);
       setForm({ nombreUsuario: '', nombreCompleto: '', email: '', password: '', roles: ['Academico'] });
       await refreshUsers();
-      setSuccess('Usuario creado correctamente.');
-    } catch (createError) {
-      setError((createError as Error)?.message || 'No se pudo crear el usuario');
+      toastSuccess('Usuario creado correctamente.');
+    } catch {
+      toastError('No se pudo crear el usuario. Revise los datos e intente nuevamente.');
     }
   };
 
   const handleSaveUser = async (user: AdminUser) => {
-    setError('');
-    setSuccess('');
-
     const roles = user.roles || [user.rol];
     if (!roles.length) {
-      setError('Cada usuario debe tener al menos un rol.');
+      toastError('Cada usuario debe tener al menos un rol.');
       return;
     }
 
     if (roles.includes('Estudiante') && !user.estudiante_id) {
-      setError(`El usuario ${user.nombre_usuario} no tiene estudiante vinculado; use Onboarding para asignar ese rol.`);
+      toastError(`El usuario ${user.nombre_usuario} no tiene estudiante vinculado; use Onboarding para asignar ese rol.`);
       return;
     }
 
     try {
       setSavingUserId(user.id);
       await adminService.updateUser(session!.accessToken, user.id, {
+        nombreUsuario: user.nombre_usuario,
+        email: user.email,
+        nombreCompleto: user.nombre_completo,
         roles,
         activo: Boolean(user.activo),
       });
       await refreshUsers();
-      setSuccess('Usuario actualizado correctamente.');
-    } catch (saveError) {
-      setError((saveError as Error)?.message || 'No se pudo actualizar el usuario');
+      toastSuccess('Usuario actualizado correctamente.');
+    } catch {
+      toastError('No se pudo actualizar el usuario. Intente nuevamente.');
     } finally {
       setSavingUserId(null);
     }
@@ -167,7 +165,11 @@ const UserManagementView = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-cyan-50 to-orange-50 py-12 px-4">
       <div className="max-w-7xl mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden border border-cyan-200">
-        <FormHeader />
+        <SectionHeader
+          title="Gestión de Usuarios"
+          subtitle="Administre cuentas y perfiles de acceso para el entorno administrativo."
+          tone="slate"
+        />
 
         <div className="p-8 space-y-8">
           <div className="flex items-start justify-between gap-4">
@@ -191,7 +193,7 @@ const UserManagementView = () => {
               <div className="md:col-span-2 rounded-xl border bg-slate-50 p-3">
                 <p className="text-sm font-semibold text-slate-800 mb-2">Roles</p>
                 <div className="flex flex-wrap gap-3">
-                  {ROLE_OPTIONS.map((role) => (
+                  {CREATE_ROLE_OPTIONS.map((role) => (
                     <label key={role} className="inline-flex items-center gap-2 text-sm text-slate-700">
                       <input type="checkbox" checked={form.roles.includes(role)} onChange={() => toggleFormRole(role)} />
                       {role}
@@ -226,9 +228,28 @@ const UserManagementView = () => {
                   <tbody>
                     {users.map((user) => (
                       <tr key={user.id} className="border-b last:border-0 align-top">
-                        <td className="py-3 pr-4">{user.nombre_usuario}</td>
-                        <td className="py-3 pr-4">{user.email}</td>
-                        <td className="py-3 pr-4">{user.nombre_completo}</td>
+                        <td className="py-3 pr-4">
+                          <input
+                            value={user.nombre_usuario}
+                            onChange={(e) => setUsers((prev) => prev.map((item) => item.id === user.id ? { ...item, nombre_usuario: e.target.value } : item))}
+                            className="px-3 py-2 border rounded-lg min-w-36"
+                          />
+                        </td>
+                        <td className="py-3 pr-4">
+                          <input
+                            type="email"
+                            value={user.email}
+                            onChange={(e) => setUsers((prev) => prev.map((item) => item.id === user.id ? { ...item, email: e.target.value } : item))}
+                            className="px-3 py-2 border rounded-lg min-w-52"
+                          />
+                        </td>
+                        <td className="py-3 pr-4">
+                          <input
+                            value={user.nombre_completo}
+                            onChange={(e) => setUsers((prev) => prev.map((item) => item.id === user.id ? { ...item, nombre_completo: e.target.value } : item))}
+                            className="px-3 py-2 border rounded-lg min-w-56"
+                          />
+                        </td>
                         <td className="py-3 pr-4">
                           <div className="flex flex-col gap-1">
                             {ROLE_OPTIONS.map((role) => (
@@ -269,8 +290,6 @@ const UserManagementView = () => {
             )}
           </section>
 
-          {error && <p className="text-sm font-semibold text-red-600">{error}</p>}
-          {success && <p className="text-sm font-semibold text-green-700">{success}</p>}
         </div>
       </div>
     </div>

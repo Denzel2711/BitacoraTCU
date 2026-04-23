@@ -17,6 +17,12 @@ const ProtectedFormPage = () => {
 
     const roles = session?.user.roles || [];
     const isStudent = roles.includes('Estudiante') && Boolean(session?.user.estudianteId);
+    const requiresPasswordChange = Boolean(session?.user.requiereCambioPassword);
+
+    if (!loading && isAuthenticated && requiresPasswordChange) {
+      router.replace('/auth');
+      return;
+    }
 
     if (!loading && !isStudent) {
       router.replace('/admin');
@@ -51,24 +57,12 @@ const ProtectedFormPage = () => {
   }
 
   return (
-    <div>
-      <div className="max-w-5xl mx-auto px-4 pt-6">
-        <div className="bg-white border border-cyan-200 rounded-xl px-4 py-3 flex items-center justify-between shadow-sm">
-          <div>
-            <p className="text-sm font-semibold text-slate-900">{session.user.nombreCompleto}</p>
-            <p className="text-xs text-slate-600">{session.user.email} · {session.user.roles.join(', ')}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => void logout()}
-            className="px-3 py-2 rounded-lg bg-slate-700 text-white text-sm font-semibold hover:bg-slate-800"
-          >
-            Cerrar sesión
-          </button>
-        </div>
-      </div>
-      <TCUFormView accessToken={session.accessToken} estudianteSesionId={session.user.estudianteId} />
-    </div>
+    <TCUFormView
+      accessToken={session.accessToken}
+      estudianteSesionId={session.user.estudianteId}
+      sessionUser={session.user}
+      onLogout={() => void logout()}
+    />
   );
 };
 
