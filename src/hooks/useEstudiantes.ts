@@ -1,13 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { formService } from '@/services/form';
 import type { Estudiante } from '@/types';
 
 export const useEstudiantes = () => {
-  const [cedulaSearch, setCedulaSearch]       = useState('');
-  const [showDropdown, setShowDropdown]       = useState(false);
-  const [filteredEstudiantes, setFilteredEstudiantes] = useState<Estudiante[]>([]);
-  const [estudiantes, setEstudiantes]         = useState<Estudiante[]>([]);
-  const [loading, setLoading]                 = useState(false);
+  const [cedulaSearch, setCedulaSearch] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [estudiantes, setEstudiantes]   = useState<Estudiante[]>([]);
+  const [loading, setLoading]           = useState(false);
 
   useEffect(() => {
     const cargarEstudiantes = async () => {
@@ -24,18 +23,14 @@ export const useEstudiantes = () => {
     cargarEstudiantes();
   }, []);
 
-  useEffect(() => {
-    if (cedulaSearch) {
-      const filtered = estudiantes.filter(est =>
-        est.cedula.includes(cedulaSearch) ||
-        est.nombre.toLowerCase().includes(cedulaSearch.toLowerCase()) ||
-        est.primer_apellido?.toLowerCase().includes(cedulaSearch.toLowerCase()) ||
-        est.primerApellido?.toLowerCase().includes(cedulaSearch.toLowerCase())
-      );
-      setFilteredEstudiantes(filtered);
-    } else {
-      setFilteredEstudiantes(estudiantes);
-    }
+  const filteredEstudiantes = useMemo(() => {
+    if (!cedulaSearch) return estudiantes;
+    return estudiantes.filter(est =>
+      est.cedula.includes(cedulaSearch) ||
+      est.nombre.toLowerCase().includes(cedulaSearch.toLowerCase()) ||
+      est.primer_apellido?.toLowerCase().includes(cedulaSearch.toLowerCase()) ||
+      est.primerApellido?.toLowerCase().includes(cedulaSearch.toLowerCase())
+    );
   }, [cedulaSearch, estudiantes]);
 
   return { cedulaSearch, setCedulaSearch, showDropdown, setShowDropdown, filteredEstudiantes, loading };
