@@ -13,8 +13,7 @@ export function GET() {
       estudiantesOnboarding: '/api/estudiantes/onboarding',
       actividades: '/api/actividades',
       auditoria: '/api/auditoria',
-      evidencias: '/api/evidencias',
-      reportes: '/api/reportes/bitacora-pdf/:estudiante_id'
+      evidencias: '/api/evidencias'
     }
   });
 }
